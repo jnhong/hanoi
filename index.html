@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+<canvas style="border: 1px solid black;">
+
+</canvas>
+    
+</body>
+
+<script>
+
+    let canvas = document.querySelector('canvas');
+    let ctx = canvas.getContext('2d');
+
+    canvas.width = 500;
+    canvas.height = 500;
+    let scale_factor = 1;
+    canvas.style.width = scale_factor * canvas.width + "px";
+    canvas.style.height = scale_factor * canvas.height + "px";
+    
+
+
+    class Stack {
+
+        constructor(stack_num) {
+            this.disks = [];
+            this.pos_x = (canvas.width / 6) * (2 * stack_num + 1);
+        }
+
+        static initialize(num_disks) {
+            // set the number of stacks to use
+            Stack.num_disks = num_disks;
+            // set proportional gap between stacks
+            Stack.gap = 1 / 10;
+            // max width of a disk is a third of the canvas width minus a proportional gap
+            Stack.disk_max_width = canvas.width * (1 / 3) * (1 - Stack.gap);
+            // set the table line
+            Stack.table_pos_y = canvas.height * (2 / 3);
+            // compute max stack height
+            Stack.stack_max_height = canvas.height * (1 / 3);
+            // set disk height in proportion to max stack height
+            Stack.disk_height = Stack.stack_max_height / Stack.num_disks;
+
+            // create new stacks
+            Stack.stacks = [];
+            for (let i = 0; i < 3; ++i) {
+                Stack.stacks.push(new Stack(i));
+            }
+
+            let A = Stack.stacks[0];
+            for (let i = Stack.num_disks; i > 0; --i) {
+                A.disks.push(i);
+            }
+        }
+
+        static disk_width(i) {
+            return Stack.disk_max_width * (i / Stack.num_disks);
+        }
+
+        static draw_disk(x, y, i) {
+            // (x, y) is the center of the bottom of the disk
+            let width = Stack.disk_width(i);
+            ctx.fillStyle = "rgb(" + Math.floor(0 + ((Stack.num_disks - i) / Stack.num_disks) * 255) + ", 0, 0)";
+            ctx.fillRect(x - width / 2, y - Stack.disk_height, width, Stack.disk_height);
+        }
+
+        static draw_stacks() {
+            let stacks = Stack.stacks;
+            // draw the stacks as represented in Stack.stacks
+            for (let i = 0; i < 3; ++i) {
+                // draw ith stack
+                let x = stacks[i].pos_x;
+                let y = Stack.table_pos_y;
+                let disks = stacks[i].disks;
+                for (let j = 0; j < disks.length; ++j) {
+                    // draw the jth disk (bottom up)
+                    Stack.draw_disk(x, y, disks[j]);
+                    y -= Stack.disk_height;
+                }
+            }
+        }
+
+        static solve() {
+            // clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // create first frame
+            Stack.draw_stacks();
+            // iterative solve by moving from state to state
+            if (Stack.num_disks % 2 == 0) {
+                [Stack.A, Stack.B, Stack.C] = Stack.stacks;
+            } else {
+                [Stack.A, Stack.C, Stack.B] = Stack.stacks;
+            }
+            Stack.step = 0;
+            // request animation frame
+            Stack.next_step();
+        }
+
+        static next_step() {
+            switch (Stack.step % 3) {
+                case 0:
+                    Stack.legal_move(Stack.A, Stack.B);
+                    break;
+                case 1:
+                    Stack.legal_move(Stack.A, Stack.C);
+                    break;
+                case 2:
+                    Stack.legal_move(Stack.B, Stack.C);
+                    break;
+            }
+        }
+
+        static legal_move(A, B) {
+            // check which direction to move
+            // A to B if B is empty or the top disk of A is smaller
+            if (B.disks.length == 0 || A.disks[A.disks.length - 1] < B.disks[B.disks.length - 1]) {
+                Stack.move(A, B);
+            } else {
+                Stack.move(B, A);
+            }
+        }
+        
+        static move(A, B) {
+            let disk = A.disks.pop();
+            Stack.animate(0, 60, disk, A, B);
+        }
+
+        static animate(i, n, disk, A, B) {
+            if (i == n) {
+                B.disks.push(disk);
+                Stack.step += 1;
+                if (Stack.C.disks.length < Stack.num_disks) 
+                    Stack.next_step();
+            } else {
+                // compute (x, y)
+                let j;
+                let x, y;
+                let third = n / 3;
+                if (i <= third) {
+                    j = i;
+                    x = A.pos_x;
+                    let start = Stack.table_pos_y - A.disks.length * Stack.disk_height;
+                    let end = Stack.table_pos_y - Stack.stack_max_height;
+                    y = start + (end - start) * j / third;
+                } else if (i <= 2 * third) {
+                    j = i - third;
+                    x = A.pos_x + (B.pos_x - A.pos_x) * j / third;
+                    y = Stack.table_pos_y - Stack.stack_max_height;
+                } else {
+                    j = i - 2 * third;
+                    x = B.pos_x;
+                    let start = Stack.table_pos_y - Stack.stack_max_height;
+                    let end = Stack.table_pos_y - B.disks.length * Stack.disk_height;
+                    y = start + (end - start) * j / third;
+                }
+                // animate move
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                Stack.draw_stacks();
+                Stack.draw_disk(x, y, disk);
+                requestAnimationFrame(() => {
+                    Stack.animate(i + 1, n, disk, A, B);
+                })
+            }
+        }
+    }
+
+
+    num_disks = prompt("Enter number of disks:", 5);
+    Stack.initialize(num_disks);
+    Stack.solve();
+
+</script>
+</html>
